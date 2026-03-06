@@ -29,7 +29,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install requirements
-pip install fastapi uvicorn google-genai psycopg2-binary SQLAlchemy websockets python-dotenv httpx
+pip install -r requirements.txt
 
 # Set your Gemini API key
 export GEMINI_API_KEY="your_api_key_here"
