@@ -2,7 +2,7 @@
 
 AdaptTutor is an emotion-aware adaptive coding tutoring system that monitors student behavior, infers their cognitive-emotional state, and dynamically adapts its pedagogical strategy using generative AI. 
 
-## 🚀 How to Run the Project Locally
+## How to Run the Project Locally
 
 ### Prerequisites
 
