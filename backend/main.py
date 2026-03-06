@@ -58,6 +58,17 @@ async def chat_endpoint(req: ChatRequest):
     finally:
         db.close()
 
+@app.get("/api/problems")
+def get_problems():
+    from database import SessionLocal
+    import models
+    db = SessionLocal()
+    try:
+        problems = db.query(models.Problem).all()
+        return [{"id": p.id, "title": p.title, "description": p.description, "initial_code": p.initial_code} for p in problems]
+    finally:
+        db.close()
+
 @app.get("/")
 def read_root():
     return {"message": "AdaptTutor Backend Active"}
