@@ -1,22 +1,16 @@
 import os
-from google import genai
-from google.genai import types
+import httpx
 from inference import infer_student_state
 from sqlalchemy.orm import Session
 import models
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-# Initialize client if key exists
-client = None
-if GEMINI_API_KEY:
-    client = genai.Client(api_key=GEMINI_API_KEY)
-
-def generate_tutor_response(db: Session, session_id: int, user_message: str, current_code: str, recent_error: str) -> str:
+async def generate_tutor_response_async(db: Session, session_id: int, user_message: str, current_code: str, recent_error: str) -> str:
     """
-    Generates an adaptive response from Gemini 2.5 Flash based on the user's inferred state.
+    Generates an adaptive response from Gemini 2.5 Flash using the REST API.
     """
-    if not client:
+    if not GEMINI_API_KEY:
         return "[Mock Response] The API key is not set. Please set GEMINI_API_KEY. I infer you are making good progress!"
         
     session = db.query(models.Session).filter(models.Session.id == session_id).first()
@@ -56,12 +50,26 @@ Student Message: {user_message}
 
 Based on the pedagogical strategy, please provide your response."""
 
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}]
+    }
+    
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-        )
-        return response.text
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, timeout=10.0)
+            
+        if response.status_code == 200:
+            data = response.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            print(f"Gemini API Error: {response.status_code} {response.text}")
+            return "I'm having trouble connecting to my AI brain right now. Can you try asking again?"
     except Exception as e:
-        print(f"Gemini API Error: {e}")
+        print(f"Gemini Exception: {e}")
         return "I'm having trouble connecting to my AI brain right now. Can you try asking again?"
+
+def generate_tutor_response(db: Session, session_id: int, user_message: str, current_code: str, recent_error: str) -> str:
+    # Deprecated sync wrapper if used elsewhere
+    pass
+

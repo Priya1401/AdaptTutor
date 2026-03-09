@@ -37,12 +37,12 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
     from database import SessionLocal
-    from tutor import generate_tutor_response
+    from tutor import generate_tutor_response_async
     from inference import infer_student_state
     import models
     db = SessionLocal()
     try:
-        response_text = generate_tutor_response(db, req.session_id, req.message, req.code, req.error)
+        response_text = await generate_tutor_response_async(db, req.session_id, req.message, req.code, req.error)
         current_state = infer_student_state(db, req.session_id)
         
         # Log the latest state & tutor response
@@ -66,6 +66,31 @@ def get_problems():
     try:
         problems = db.query(models.Problem).all()
         return [{"id": p.id, "title": p.title, "description": p.description, "initial_code": p.initial_code} for p in problems]
+    finally:
+        db.close()
+
+class SurveySubmitRequest(BaseModel):
+    session_id: int
+    survey_type: str
+    responses: dict
+
+@app.post("/api/survey")
+async def submit_survey(req: SurveySubmitRequest):
+    from database import SessionLocal
+    import models
+    db = SessionLocal()
+    try:
+        new_survey = models.SurveyResponse(
+            session_id=req.session_id,
+            survey_type=req.survey_type,
+            responses=req.responses
+        )
+        db.add(new_survey)
+        db.commit()
+        return {"status": "success", "message": f"{req.survey_type} survey saved successfully."}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
     finally:
         db.close()
 

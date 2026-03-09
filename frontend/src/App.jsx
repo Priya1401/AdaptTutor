@@ -4,9 +4,26 @@ import ProblemDescription from './components/ProblemDescription'
 import TutorChat from './components/TutorChat'
 import CodeEditor from './components/CodeEditor'
 import ExecutionConsole from './components/ExecutionConsole'
+import SurveyForm from './components/SurveyForm'
 import { useTelemetry } from './hooks/useTelemetry'
 
+const PRE_SURVEY_QUESTIONS = [
+  {
+    id: 'experience', text: 'How many years of programming experience do you have?', type: 'radio', options: [
+      { label: '< 1 year', value: '0' }, { label: '1-3 years', value: '1' }, { label: '3-5 years', value: '3' }, { label: '5+ years', value: '5' }
+    ]
+  },
+  { id: 'python_skill', text: 'Rate your proficiency in Python:', type: 'likert' }
+];
+
+const POST_SURVEY_QUESTIONS = [
+  { id: 'usefulness', text: 'The AI Tutor was useful in helping me solve the problems.', type: 'likert' },
+  { id: 'frustration', text: 'I felt frustrated during the coding tasks.', type: 'likert' },
+  { id: 'feedback', text: 'Any additional feedback?', type: 'text', required: false }
+];
+
 function App() {
+  const [appState, setAppState] = useState('pre-survey'); // 'pre-survey', 'coding', 'post-survey', 'completed'
   const [problems, setProblems] = useState([]);
   const [activeProblem, setActiveProblem] = useState(null);
   const [code, setCode] = useState('');
@@ -49,12 +66,31 @@ function App() {
   };
 
 
+  const getDriverCode = (problemId) => {
+    switch (problemId) {
+      case 1: return '\n\nprint(twoSum([2,7,11,15], 9))';
+      case 2: return '\n\nprint(isPalindrome(121))\nprint(isPalindrome(-121))';
+      case 3: return '\n\nprint(fizzBuzz(3))';
+      default: return '';
+    }
+  };
+
+  const getExpectedOutputText = (problemId) => {
+    switch (problemId) {
+      case 1: return '[0, 1]';
+      case 2: return 'True\nFalse';
+      case 3: return "['1', '2', 'Fizz']";
+      default: return '';
+    }
+  };
+
   const handleRun = async () => {
     setIsExecuting(true);
     trackAction('run_click');
     try {
+      const codeToRun = code + getDriverCode(activeProblem?.id);
       const resp = await axios.post('http://localhost:8000/api/execute', {
-        source_code: code,
+        source_code: codeToRun,
         language_id: 71
       });
       const data = resp.data;
@@ -76,8 +112,9 @@ function App() {
     setIsExecuting(true);
     trackAction('submit_click');
     try {
+      const codeToRun = code + getDriverCode(activeProblem?.id);
       const resp = await axios.post('http://localhost:8000/api/execute', {
-        source_code: code,
+        source_code: codeToRun,
         language_id: 71
       });
       const data = resp.data;
@@ -85,8 +122,18 @@ function App() {
         setError(data.stderr || data.compile_output);
         setOutput('');
       } else {
-        setOutput(data.stdout || 'Success (No Output)\nAll tests passed.');
-        setError('');
+        const actualOutput = (data.stdout || '').trim();
+        const expectedOutput = getExpectedOutputText(activeProblem?.id);
+
+        if (actualOutput === expectedOutput) {
+          setOutput(`${actualOutput}\n\nSuccess! All tests passed.`);
+          setError('');
+          trackAction('submission_result', { status: 'success' });
+        } else {
+          setError(`Wrong Answer.\nExpected:\n${expectedOutput}\n\nGot:\n${actualOutput}`);
+          setOutput('');
+          trackAction('submission_result', { status: 'wrong_answer' });
+        }
       }
     } catch (err) {
       setError('Failed to connect to execution server.');
@@ -94,6 +141,55 @@ function App() {
       setIsExecuting(false);
     }
   };
+
+  const handleSurveySubmit = async (surveyType, responses) => {
+    try {
+      await axios.post('http://localhost:8000/api/survey', {
+        session_id: 1, // Currently hardcoded
+        survey_type: surveyType,
+        responses: responses
+      });
+
+      if (surveyType === 'pre') {
+        setAppState('coding');
+      } else {
+        setAppState('completed');
+      }
+    } catch (err) {
+      console.error("Failed to submit survey", err);
+      // Proceed anyway for robustness in study
+      setAppState(surveyType === 'pre' ? 'coding' : 'completed');
+    }
+  };
+
+  if (appState === 'pre-survey') {
+    return <SurveyForm
+      title="Pre-Study Questionnaire"
+      description="Please answer a few questions before beginning the coding tasks."
+      questions={PRE_SURVEY_QUESTIONS}
+      onSubmit={(responses) => handleSurveySubmit('pre', responses)}
+    />;
+  }
+
+  if (appState === 'post-survey') {
+    return <SurveyForm
+      title="Post-Study Questionnaire"
+      description="Thank you for participating! Please provide your feedback on the experience."
+      questions={POST_SURVEY_QUESTIONS}
+      onSubmit={(responses) => handleSurveySubmit('post', responses)}
+    />;
+  }
+
+  if (appState === 'completed') {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#0d1117] text-white">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-4">Study Completed</h1>
+          <p className="text-gray-400">Thank you for your participation. You may now close this window.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-full flex bg-[#0d1117] overflow-hidden">
@@ -127,6 +223,14 @@ function App() {
                 <option value="static">Static Control</option>
               </select>
             </div>
+          </div>
+          <div>
+            <button
+              onClick={() => setAppState('post-survey')}
+              className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded transition-colors"
+            >
+              Finish Study
+            </button>
           </div>
         </div>
         <CodeEditor code={code} onChange={handleCodeChange} />

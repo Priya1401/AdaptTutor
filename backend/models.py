@@ -54,3 +54,14 @@ class InferredState(Base):
     tutor_response = Column(Text, nullable=True)
     
     session = relationship("Session", back_populates="states")
+
+class SurveyResponse(Base):
+    __tablename__ = "survey_responses"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"))
+    survey_type = Column(String) # 'pre' or 'post'
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    responses = Column(JSON) # e.g. {"prior_experience": 3, "feedback": "Helped a lot"}
+    
+    session = relationship("Session")
