@@ -6,6 +6,8 @@ export function useTelemetry(sessionId) {
     const pauseIntervalRef = useRef(null);
 
     useEffect(() => {
+        if (!sessionId) return;
+
         // Connect to WebSocket
         wsRef.current = new WebSocket(`ws://localhost:8000/ws/telemetry/${sessionId}`);
 

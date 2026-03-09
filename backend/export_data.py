@@ -1,43 +1,53 @@
-import csv
 import os
+import csv
+import json
 from database import SessionLocal
-import models
-from datetime import datetime
+from models import User, Session, Problem, BehavioralLog, InferredState, SurveyResponse
 
-def export_to_csv():
+EXPORT_DIR = "data_exports"
+if not os.path.exists(EXPORT_DIR):
+    os.makedirs(EXPORT_DIR)
+
+def export_sessions(db):
+    sessions = db.query(Session).all()
+    filepath = os.path.join(EXPORT_DIR, "sessions.csv")
+    with open(filepath, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['session_id', 'user_id', 'condition', 'start_time', 'end_time'])
+        for s in sessions:
+            writer.writerow([s.id, s.user_id, s.condition, s.start_time, s.end_time])
+    print(f"Exported {len(sessions)} sessions to {filepath}")
+
+def export_telemetry(db):
+    logs = db.query(BehavioralLog).all()
+    filepath = os.path.join(EXPORT_DIR, "telemetry.csv")
+    with open(filepath, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['log_id', 'session_id', 'timestamp', 'event_type', 'event_data'])
+        for l in logs:
+            writer.writerow([l.id, l.session_id, l.timestamp, l.event_type, json.dumps(l.event_data)])
+    print(f"Exported {len(logs)} telemetry logs to {filepath}")
+
+def export_surveys(db):
+    surveys = db.query(SurveyResponse).all()
+    filepath = os.path.join(EXPORT_DIR, "surveys.csv")
+    with open(filepath, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['survey_id', 'session_id', 'survey_type', 'timestamp', 'responses'])
+        for s in surveys:
+            writer.writerow([s.id, s.session_id, s.survey_type, s.timestamp, json.dumps(s.responses)])
+    print(f"Exported {len(surveys)} survey responses to {filepath}")
+
+def main():
     db = SessionLocal()
     try:
-        # Export Sessions
-        print("Exporting sessions...")
-        sessions = db.query(models.Session).all()
-        with open('export_sessions.csv', 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['Session ID', 'User ID', 'Condition', 'Start Time', 'End Time'])
-            for s in sessions:
-                writer.writerow([s.id, s.user_id, s.condition, s.start_time, s.end_time])
-                
-        # Export Telemetry
-        print("Exporting behavioral logs...")
-        logs = db.query(models.BehavioralLog).all()
-        with open('export_telemetry.csv', 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['Log ID', 'Session ID', 'Timestamp', 'Event Type', 'Event Data'])
-            for log in logs:
-                writer.writerow([log.id, log.session_id, log.timestamp, log.event_type, log.event_data])
-                
-        # Export Inferred States
-        print("Exporting inferred states (Tutor Interactions)...")
-        states = db.query(models.InferredState).all()
-        with open('export_states.csv', 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['State ID', 'Session ID', 'Timestamp', 'Inferred State', 'Tutor Response'])
-            for state in states:
-                writer.writerow([state.id, state.session_id, state.timestamp, state.state, state.tutor_response])
-                
-        print("Export complete! Files saved to backend/ directory.")
-        
+        print("Starting data export...")
+        export_sessions(db)
+        export_telemetry(db)
+        export_surveys(db)
+        print("Export complete!")
     finally:
         db.close()
 
 if __name__ == "__main__":
-    export_to_csv()
+    main()

@@ -98,6 +98,38 @@ async def submit_survey(req: SurveySubmitRequest):
 def read_root():
     return {"message": "AdaptTutor Backend Active"}
 
+@app.post("/api/sessions/start")
+def start_session():
+    import uuid
+    from database import SessionLocal
+    import models
+    db = SessionLocal()
+    try:
+        # Determine condition assignment to balance groups
+        adaptive_count = db.query(models.Session).filter(models.Session.condition == 'adaptive').count()
+        static_count = db.query(models.Session).filter(models.Session.condition == 'static').count()
+        
+        condition = 'adaptive' if static_count >= adaptive_count else 'static'
+        
+        # Create a new anonymous user for this session
+        new_user = models.User(username=f"user_{uuid.uuid4().hex[:8]}")
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        # Create the session
+        new_session = models.Session(user_id=new_user.id, condition=condition)
+        db.add(new_session)
+        db.commit()
+        db.refresh(new_session)
+        
+        return {"session_id": new_session.id, "condition": condition}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
+
 @app.websocket("/ws/telemetry/{session_id}")
 async def telemetry_endpoint(websocket: WebSocket, session_id: int):
     await websocket.accept()
@@ -108,24 +140,9 @@ async def telemetry_endpoint(websocket: WebSocket, session_id: int):
         while True:
             data = await websocket.receive_json()
             
-            # Simple session auto-create for prototyping if it doesn't exist
-            # Real app would create Session records elsewhere during login/start.
             db_session = db.query(models.Session).filter(models.Session.id == session_id).first()
             if not db_session:
-                # Just mock a user/problem/session for telemetry to succeed
-                mock_user = db.query(models.User).filter(models.User.id == 1).first()
-                if not mock_user:
-                    mock_user = models.User(id=1, username="test_student")
-                    db.add(mock_user)
-                    db.commit()
-                
-                db_session = models.Session(
-                    id=session_id, 
-                    user_id=mock_user.id,
-                    condition='adaptive'
-                )
-                db.add(db_session)
-                db.commit()
+                continue
 
             # Insert raw behavioral log
             log = models.BehavioralLog(

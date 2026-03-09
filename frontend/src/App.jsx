@@ -30,8 +30,9 @@ function App() {
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
-  const [condition, setCondition] = useState('adaptive'); // 'adaptive' or 'static'
-  const { trackKeystroke, trackAction } = useTelemetry(1); // Mock Session ID = 1
+  const [condition, setCondition] = useState(''); // 'adaptive' or 'static'
+  const [sessionId, setSessionId] = useState(null);
+  const { trackKeystroke, trackAction } = useTelemetry(sessionId);
 
   React.useEffect(() => {
     // Fetch available problems
@@ -144,8 +145,18 @@ function App() {
 
   const handleSurveySubmit = async (surveyType, responses) => {
     try {
+      let currentSessionId = sessionId;
+
+      // Start the session tracking when they complete the pre-survey
+      if (surveyType === 'pre' && !sessionId) {
+        const sessionResp = await axios.post('http://localhost:8000/api/sessions/start');
+        currentSessionId = sessionResp.data.session_id;
+        setSessionId(currentSessionId);
+        setCondition(sessionResp.data.condition);
+      }
+
       await axios.post('http://localhost:8000/api/survey', {
-        session_id: 1, // Currently hardcoded
+        session_id: currentSessionId || 1, // Fallback if something fails
         survey_type: surveyType,
         responses: responses
       });
@@ -212,17 +223,12 @@ function App() {
                 ))}
               </select>
             </div>
-            <div className="flex items-center gap-2 border-l border-[#30363d] pl-4">
-              <span className="text-sm font-semibold text-gray-400">Study Condition:</span>
-              <select
-                value={condition}
-                onChange={(e) => setCondition(e.target.value)}
-                className="bg-[#21262d] border border-[#30363d] text-white text-sm rounded px-2 py-1 outline-none"
-              >
-                <option value="adaptive">Adaptive Tutor</option>
-                <option value="static">Static Control</option>
-              </select>
-            </div>
+            {condition && (
+              <div className="flex items-center gap-2 border-l border-[#30363d] pl-4">
+                <span className="text-sm font-semibold text-gray-400">Study Condition:</span>
+                <span className="text-sm text-gray-300">{condition === 'adaptive' ? 'Adaptive Tutor' : 'Static Control'}</span>
+              </div>
+            )}
           </div>
           <div>
             <button
@@ -248,7 +254,7 @@ function App() {
         onHelpClick={() => trackAction('help_click')}
         code={code}
         error={error}
-        sessionId={1}
+        sessionId={sessionId || 1}
         condition={condition}
       />
     </div>
