@@ -38,6 +38,16 @@ def export_surveys(db):
             writer.writerow([s.id, s.session_id, s.survey_type, s.timestamp, json.dumps(s.responses)])
     print(f"Exported {len(surveys)} survey responses to {filepath}")
 
+def export_inferred_states(db):
+    states = db.query(InferredState).all()
+    filepath = os.path.join(EXPORT_DIR, "inferred_states.csv")
+    with open(filepath, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['state_id', 'session_id', 'timestamp', 'state', 'tutor_response'])
+        for s in states:
+            writer.writerow([s.id, s.session_id, s.timestamp, s.state, s.tutor_response])
+    print(f"Exported {len(states)} inferred states to {filepath}")
+
 def main():
     db = SessionLocal()
     try:
@@ -45,6 +55,7 @@ def main():
         export_sessions(db)
         export_telemetry(db)
         export_surveys(db)
+        export_inferred_states(db)
         print("Export complete!")
     finally:
         db.close()

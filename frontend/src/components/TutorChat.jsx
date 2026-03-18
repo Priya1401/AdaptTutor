@@ -1,14 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, HelpCircle, Loader2 } from 'lucide-react';
 import axios from 'axios';
+
+function formatMessage(text) {
+    // bold
+    let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // inline code
+    formatted = formatted.replace(/`([^`]+)`/g, '<code class="bg-[#0d1117] px-1 py-0.5 rounded text-blue-300 text-xs">$1</code>');
+    // code blocks
+    formatted = formatted.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre class="bg-[#0d1117] p-3 rounded my-2 overflow-x-auto text-xs"><code>$2</code></pre>');
+    // newlines to br
+    formatted = formatted.replace(/\n/g, '<br/>');
+    return formatted;
+}
 
 export default function TutorChat({ onHelpClick, code, error, sessionId, condition }) {
     const [messages, setMessages] = useState([
         { role: 'assistant', content: 'Hi! I am AdaptTutor. I will be observing your progress and helping you out if you get stuck.' }
     ]);
     const [input, setInput] = useState('');
-
     const [isTyping, setIsTyping] = useState(false);
+    const chatEndRef = useRef(null);
+
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages, isTyping]);
 
     const handleSend = async (overrideMessage = null) => {
         const textToSend = overrideMessage || input;
@@ -25,7 +41,8 @@ export default function TutorChat({ onHelpClick, code, error, sessionId, conditi
                 message: textToSend,
                 code: code,
                 condition: condition,
-                error: error || ""
+                error: error || "",
+                chat_history: newMessages.slice(1) // skip initial greeting
             });
             setMessages([...newMessages, { role: 'assistant', content: resp.data.response }]);
         } catch (err) {
@@ -61,12 +78,13 @@ export default function TutorChat({ onHelpClick, code, error, sessionId, conditi
                             }`}>
                             {msg.role === 'user' ? <User size={16} className="text-white" /> : <Bot size={16} className="text-white" />}
                         </div>
-                        <div className={`p-3 rounded-lg max-w-[85%] text-sm ${msg.role === 'user'
-                            ? 'bg-blue-600/20 text-blue-100 border border-blue-500/30 rounded-tr-none'
-                            : 'bg-[#21262d] text-[#c9d1d9] border border-[#30363d] rounded-tl-none'
-                            }`}>
-                            {msg.content}
-                        </div>
+                        <div
+                            className={`p-3 rounded-lg max-w-[85%] text-sm ${msg.role === 'user'
+                                ? 'bg-blue-600/20 text-blue-100 border border-blue-500/30 rounded-tr-none'
+                                : 'bg-[#21262d] text-[#c9d1d9] border border-[#30363d] rounded-tl-none'
+                                }`}
+                            dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }}
+                        />
                     </div>
                 ))}
                 {isTyping && (
@@ -79,6 +97,7 @@ export default function TutorChat({ onHelpClick, code, error, sessionId, conditi
                         </div>
                     </div>
                 )}
+                <div ref={chatEndRef} />
             </div>
 
             <div className="p-4 border-t border-[#30363d]">
@@ -92,7 +111,7 @@ export default function TutorChat({ onHelpClick, code, error, sessionId, conditi
                         className="flex-1 bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
                     />
                     <button
-                        onClick={handleSend}
+                        onClick={() => handleSend()}
                         className="bg-[#238636] hover:bg-[#2ea043] text-white p-2 rounded transition-colors"
                     >
                         <Send size={18} />
