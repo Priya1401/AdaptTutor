@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, HelpCircle, Loader2 } from 'lucide-react';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 function formatMessage(text) {
     // bold
@@ -36,7 +37,7 @@ export default function TutorChat({ onHelpClick, code, error, sessionId, conditi
         setIsTyping(true);
 
         try {
-            const resp = await axios.post('http://localhost:8000/api/chat', {
+            const resp = await axios.post(`${API_URL}/api/chat`, {
                 session_id: sessionId,
                 message: textToSend,
                 code: code,

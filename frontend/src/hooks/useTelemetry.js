@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { WS_URL } from '../config';
 
 export function useTelemetry(sessionId) {
     const wsRef = useRef(null);
@@ -19,7 +20,7 @@ export function useTelemetry(sessionId) {
     const connect = useCallback(() => {
         if (isUnmountedRef.current || !sessionId) return;
 
-        const ws = new WebSocket(`ws://localhost:8000/ws/telemetry/${sessionId}`);
+        const ws = new WebSocket(`${WS_URL}/ws/telemetry/${sessionId}`);
         wsRef.current = ws;
 
         ws.onopen = () => {

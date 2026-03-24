@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import axios from 'axios'
+import { API_URL } from './config'
 import ProblemDescription from './components/ProblemDescription'
 import TutorChat from './components/TutorChat'
 import CodeEditor from './components/CodeEditor'
@@ -103,7 +104,7 @@ function App() {
   const group = urlParams.get('group') || 'a';
 
   React.useEffect(() => {
-    axios.get('http://localhost:8000/api/problems')
+    axios.get(`${API_URL}/api/problems`)
       .then(res => {
         setAllProblems(res.data);
         // Map problems in the randomized order for this participant
@@ -124,7 +125,7 @@ function App() {
     if (sessionId && activeProblem) {
       const cond = getConditionForProblem(group, currentProblemIndex);
       setCondition(cond);
-      axios.post('http://localhost:8000/api/sessions/problem', {
+      axios.post(`${API_URL}/api/sessions/problem`, {
         session_id: sessionId,
         problem_id: activeProblem.id,
         condition: cond
@@ -184,7 +185,7 @@ function App() {
     trackAction('run_click');
     try {
       const codeToRun = code + getDriverCode(activeProblem?.id);
-      const resp = await axios.post('http://localhost:8000/api/execute', {
+      const resp = await axios.post(`${API_URL}/api/execute`, {
         source_code: codeToRun,
         language_id: 71
       });
@@ -210,7 +211,7 @@ function App() {
     trackAction('submit_click');
     try {
       const codeToRun = code + getDriverCode(activeProblem?.id);
-      const resp = await axios.post('http://localhost:8000/api/execute', {
+      const resp = await axios.post(`${API_URL}/api/execute`, {
         source_code: codeToRun,
         language_id: 71
       });
@@ -247,7 +248,7 @@ function App() {
   const handleProblemSurveySubmit = async (responses) => {
     if (sessionId) {
       try {
-        await axios.post('http://localhost:8000/api/survey', {
+        await axios.post(`${API_URL}/api/survey`, {
           session_id: sessionId,
           survey_type: `post_problem_${activeProblem.id}`,
           responses: {
@@ -286,7 +287,7 @@ function App() {
 
     if (sessionId) {
       try {
-        await axios.post(`http://localhost:8000/api/sessions/${sessionId}/end`);
+        await axios.post(`${API_URL}/api/sessions/${sessionId}/end`);
       } catch (err) {
         console.error("Failed to end session", err);
       }
@@ -300,7 +301,7 @@ function App() {
 
       if (surveyType === 'pre' && !sessionId) {
         const initialCondition = getConditionForProblem(group, 0);
-        const sessionResp = await axios.post('http://localhost:8000/api/sessions/start', {
+        const sessionResp = await axios.post(`${API_URL}/api/sessions/start`, {
           condition: initialCondition
         });
         currentSessionId = sessionResp.data.session_id;
@@ -310,7 +311,7 @@ function App() {
       }
 
       if (currentSessionId) {
-        await axios.post('http://localhost:8000/api/survey', {
+        await axios.post(`${API_URL}/api/survey`, {
           session_id: currentSessionId,
           survey_type: surveyType,
           responses: { ...responses, group, problem_order: studyProblemOrder }

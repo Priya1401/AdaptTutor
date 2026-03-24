@@ -5,15 +5,20 @@ from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from datetime import datetime
 import models
+import os
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AdaptTutor API")
 
+# Allow configurable origins; defaults to * for local dev
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*")
+origins = [o.strip() for o in ALLOWED_ORIGINS.split(",")] if ALLOWED_ORIGINS != "*" else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
