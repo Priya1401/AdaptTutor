@@ -6,15 +6,34 @@ import CodeEditor from './components/CodeEditor'
 import ExecutionConsole from './components/ExecutionConsole'
 import SurveyForm from './components/SurveyForm'
 import PostProblemSurvey from './components/PostProblemSurvey'
+import ConsentScreen from './components/ConsentScreen'
 import { useTelemetry } from './hooks/useTelemetry'
 
 const PRE_SURVEY_QUESTIONS = [
   {
     id: 'experience', text: 'How many years of programming experience do you have?', type: 'radio', options: [
-      { label: '< 1 year', value: '0' }, { label: '1-3 years', value: '1' }, { label: '3-5 years', value: '3' }, { label: '5+ years', value: '5' }
+      { label: '< 1 year', value: '0' }, { label: '1–3 years', value: '1' }, { label: '3–5 years', value: '3' }, { label: '5+ years', value: '5' }
     ]
   },
-  { id: 'python_skill', text: 'Rate your proficiency in Python:', type: 'likert' }
+  { id: 'python_skill', text: 'Rate your proficiency in Python (1 = Beginner, 5 = Expert):', type: 'likert' },
+  {
+    id: 'year_in_school', text: 'What is your current year of study?', type: 'radio', options: [
+      { label: '1st year', value: '1' }, { label: '2nd year', value: '2' }, { label: '3rd year', value: '3' },
+      { label: '4th year', value: '4' }, { label: 'Graduate student', value: 'grad' }, { label: 'Other', value: 'other' }
+    ]
+  },
+  {
+    id: 'primary_language', text: 'What is your primary programming language?', type: 'radio', options: [
+      { label: 'Python', value: 'python' }, { label: 'Java', value: 'java' },
+      { label: 'JavaScript', value: 'javascript' }, { label: 'C / C++', value: 'c_cpp' }, { label: 'Other', value: 'other' }
+    ]
+  },
+  {
+    id: 'ai_tool_use', text: 'How often do you use AI coding tools (e.g. ChatGPT, Copilot)?', type: 'radio', options: [
+      { label: 'Never', value: 'never' }, { label: 'Occasionally', value: 'occasionally' },
+      { label: 'Regularly', value: 'regularly' }, { label: 'Daily', value: 'daily' }
+    ]
+  }
 ];
 
 const POST_SURVEY_QUESTIONS = [
@@ -22,16 +41,34 @@ const POST_SURVEY_QUESTIONS = [
   { id: 'frustration', text: 'I felt frustrated during the coding tasks.', type: 'likert' },
   {
     id: 'preference', text: 'Thinking about both halves of the study, which tutor experience did you prefer?', type: 'radio', options: [
-      { label: 'The tutor from the first two problems', value: 'first_half' },
-      { label: 'The tutor from the last two problems', value: 'second_half' }
+      { label: 'The tutor in the first half (problems 1–2)', value: 'first_half' },
+      { label: 'The tutor in the second half (problems 3–4)', value: 'second_half' },
+      { label: 'No preference — both felt similar', value: 'no_preference' }
     ]
   },
-  { id: 'feedback', text: 'Any additional feedback?', type: 'text', required: false }
+  {
+    id: 'noticed_difference', text: 'Did you notice any difference in how the AI tutor responded between the first and second halves of the study?', type: 'radio', options: [
+      { label: 'Yes, clearly different', value: 'yes_clearly' },
+      { label: 'Somewhat different', value: 'somewhat' },
+      { label: 'Not really', value: 'not_really' },
+      { label: 'No difference noticed', value: 'no' }
+    ]
+  },
+  { id: 'feedback', text: 'Any additional comments or feedback?', type: 'text', required: false }
 ];
 
-// Group A: problems 1,2 static → 3,4 adaptive
-// Group B: problems 1,2 adaptive → 3,4 static
-const STUDY_PROBLEMS = [1, 2, 3, 4];
+// Group A: problems at index 0,1 → static, index 2,3 → adaptive
+// Group B: problems at index 0,1 → adaptive, index 2,3 → static
+// Problem order is randomized per participant via shuffleArray
+
+function shuffleArray(arr) {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
 
 function getConditionForProblem(group, problemIndex) {
   if (group === 'b') {
@@ -42,9 +79,11 @@ function getConditionForProblem(group, problemIndex) {
 }
 
 function App() {
-  const [appState, setAppState] = useState('pre-survey');
+  const [appState, setAppState] = useState('consent');
   const [allProblems, setAllProblems] = useState([]);
   const [studyProblems, setStudyProblems] = useState([]);
+  // Randomize problem order once per participant session
+  const [studyProblemOrder] = useState(() => shuffleArray([1, 2, 3, 4]));
   const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
   const [activeProblem, setActiveProblem] = useState(null);
   const [code, setCode] = useState('');
@@ -52,7 +91,10 @@ function App() {
   const [error, setError] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
   const [condition, setCondition] = useState('');
-  const [sessionId, setSessionId] = useState(null);
+  const [sessionId, setSessionId] = useState(() => {
+    const stored = localStorage.getItem('adapttutor_session_id');
+    return stored ? parseInt(stored) : null;
+  });
   const [showProblemSurvey, setShowProblemSurvey] = useState(false);
   const [solvedProblems, setSolvedProblems] = useState(new Set());
   const { trackKeystroke, trackAction } = useTelemetry(sessionId);
@@ -64,7 +106,10 @@ function App() {
     axios.get('http://localhost:8000/api/problems')
       .then(res => {
         setAllProblems(res.data);
-        const filtered = res.data.filter(p => STUDY_PROBLEMS.includes(p.id));
+        // Map problems in the randomized order for this participant
+        const filtered = studyProblemOrder
+          .map(id => res.data.find(p => p.id === id))
+          .filter(Boolean);
         setStudyProblems(filtered);
         if (filtered.length > 0) {
           setActiveProblem(filtered[0]);
@@ -98,10 +143,10 @@ function App() {
 
   const getDriverCode = (problemId) => {
     switch (problemId) {
-      case 1: return '\n\nprint(twoSum([2,7,11,15], 9))';
-      case 2: return '\n\nprint(isPalindrome(121))\nprint(isPalindrome(-121))';
-      case 3: return '\n\nprint(fizzBuzz(3))';
-      case 4: return '\n\ns = ["h","e","l","l","o"]\nreverseString(s)\nprint(s)';
+      case 1: return '\n\nprint(twoSum([2,7,11,15], 9))\nprint(twoSum([3,2,4], 6))';
+      case 2: return '\n\nprint(isPalindrome(121))\nprint(isPalindrome(-121))\nprint(isPalindrome(0))\nprint(isPalindrome(10))';
+      case 3: return '\n\nprint(fizzBuzz(15))';
+      case 4: return '\n\ns = ["h","e","l","l","o"]\nreverseString(s)\nprint(s)\ns2 = ["H","a","n","n","a","h"]\nreverseString(s2)\nprint(s2)';
       case 5: return '\n\nprint(isValid("()"))\nprint(isValid("([)]"))';
       case 6: return '\n\nprint(maxSubArray([-2,1,-3,4,-1,2,1,-5,4]))\nprint(maxSubArray([1]))';
       default: return '';
@@ -110,10 +155,10 @@ function App() {
 
   const getExpectedOutputText = (problemId) => {
     switch (problemId) {
-      case 1: return '[0, 1]';
-      case 2: return 'True\nFalse';
-      case 3: return "['1', '2', 'Fizz']";
-      case 4: return "['o', 'l', 'l', 'e', 'h']";
+      case 1: return '[0, 1]\n[1, 2]';
+      case 2: return 'True\nFalse\nTrue\nFalse';
+      case 3: return "['1', '2', 'Fizz', '4', 'Buzz', 'Fizz', '7', '8', 'Fizz', 'Buzz', '11', 'Fizz', '13', '14', 'FizzBuzz']";
+      case 4: return "['o', 'l', 'l', 'e', 'h']\n['h', 'a', 'n', 'n', 'a', 'H']";
       case 5: return 'True\nFalse';
       case 6: return '6\n1';
       default: return '';
@@ -200,19 +245,21 @@ function App() {
   };
 
   const handleProblemSurveySubmit = async (responses) => {
-    try {
-      await axios.post('http://localhost:8000/api/survey', {
-        session_id: sessionId || 1,
-        survey_type: `post_problem_${activeProblem.id}`,
-        responses: {
-          ...responses,
-          problem_id: activeProblem.id,
-          problem_title: activeProblem.title,
-          condition: getConditionForProblem(group, currentProblemIndex)
-        }
-      });
-    } catch (err) {
-      console.error("Failed to submit problem survey", err);
+    if (sessionId) {
+      try {
+        await axios.post('http://localhost:8000/api/survey', {
+          session_id: sessionId,
+          survey_type: `post_problem_${activeProblem.id}`,
+          responses: {
+            ...responses,
+            problem_id: activeProblem.id,
+            problem_title: activeProblem.title,
+            condition: getConditionForProblem(group, currentProblemIndex)
+          }
+        });
+      } catch (err) {
+        console.error("Failed to submit problem survey", err);
+      }
     }
 
     setShowProblemSurvey(false);
@@ -232,6 +279,11 @@ function App() {
   };
 
   const handleFinishStudy = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to finish the study?\n\nThis will end your session and take you to the final survey. You won't be able to return to the coding problems."
+    );
+    if (!confirmed) return;
+
     if (sessionId) {
       try {
         await axios.post(`http://localhost:8000/api/sessions/${sessionId}/end`);
@@ -248,21 +300,27 @@ function App() {
 
       if (surveyType === 'pre' && !sessionId) {
         const initialCondition = getConditionForProblem(group, 0);
-        const sessionResp = await axios.post('http://localhost:8000/api/sessions/start', { condition: initialCondition });
+        const sessionResp = await axios.post('http://localhost:8000/api/sessions/start', {
+          condition: initialCondition
+        });
         currentSessionId = sessionResp.data.session_id;
         setSessionId(currentSessionId);
+        localStorage.setItem('adapttutor_session_id', currentSessionId);
         setCondition(sessionResp.data.condition);
       }
 
-      await axios.post('http://localhost:8000/api/survey', {
-        session_id: currentSessionId || 1,
-        survey_type: surveyType,
-        responses: { ...responses, group: group }
-      });
+      if (currentSessionId) {
+        await axios.post('http://localhost:8000/api/survey', {
+          session_id: currentSessionId,
+          survey_type: surveyType,
+          responses: { ...responses, group, problem_order: studyProblemOrder }
+        });
+      }
 
       if (surveyType === 'pre') {
         setAppState('coding');
       } else {
+        localStorage.removeItem('adapttutor_session_id');
         setAppState('completed');
       }
     } catch (err) {
@@ -270,6 +328,10 @@ function App() {
       setAppState(surveyType === 'pre' ? 'coding' : 'completed');
     }
   };
+
+  if (appState === 'consent') {
+    return <ConsentScreen onAgree={() => setAppState('pre-survey')} />;
+  }
 
   if (appState === 'pre-survey') {
     return <SurveyForm
@@ -346,7 +408,7 @@ function App() {
         onHelpClick={() => trackAction('help_click')}
         code={code}
         error={error}
-        sessionId={sessionId || 1}
+        sessionId={sessionId}
         condition={condition}
       />
     </div>

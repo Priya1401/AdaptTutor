@@ -21,9 +21,9 @@ initial_problems = [
     {
         "id": 3,
         "title": "Fizz Buzz",
-        "description": "<p>Given an integer <code>n</code>, return a string array <code>answer</code> (1-indexed) where:</p><ul><li><code>answer[i] == \"FizzBuzz\"</code> if <code>i</code> is divisible by 3 and 5.</li><li><code>answer[i] == \"Fizz\"</code> if <code>i</code> is divisible by 3.</li><li><code>answer[i] == \"Buzz\"</code> if <code>i</code> is divisible by 5.</li><li><code>answer[i] == str(i)</code> (as a string) if none of the above conditions are true.</li></ul><p><strong>Example 1:</strong><br/>Input: n = 3<br/>Output: [\"1\",\"2\",\"Fizz\"]</p>",
+        "description": "<p>Given an integer <code>n</code>, return a string array <code>answer</code> (1-indexed) where:</p><ul><li><code>answer[i] == \"FizzBuzz\"</code> if <code>i</code> is divisible by both 3 and 5.</li><li><code>answer[i] == \"Fizz\"</code> if <code>i</code> is divisible by 3 only.</li><li><code>answer[i] == \"Buzz\"</code> if <code>i</code> is divisible by 5 only.</li><li><code>answer[i] == str(i)</code> (as a string) if none of the above conditions are true.</li></ul><p><strong>Example:</strong><br/>Input: n = 15<br/>Output: [\"1\",\"2\",\"Fizz\",\"4\",\"Buzz\",\"Fizz\",\"7\",\"8\",\"Fizz\",\"Buzz\",\"11\",\"Fizz\",\"13\",\"14\",\"FizzBuzz\"]</p>",
         "initial_code": "def fizzBuzz(n):\n    # Write your code here\n    pass",
-        "expected_output": "[\"1\",\"2\",\"Fizz\"]"
+        "expected_output": "[\"1\",\"2\",\"Fizz\",\"4\",\"Buzz\",\"Fizz\",\"7\",\"8\",\"Fizz\",\"Buzz\",\"11\",\"Fizz\",\"13\",\"14\",\"FizzBuzz\"]"
     },
     {
         "id": 4,
