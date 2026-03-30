@@ -15,7 +15,7 @@ function formatMessage(text) {
     return formatted;
 }
 
-export default function TutorChat({ onHelpClick, code, error, sessionId, condition }) {
+export default function TutorChat({ onHelpClick, code, error, sessionId, condition, onStateInferred }) {
     const [messages, setMessages] = useState([
         { role: 'assistant', content: 'Hi! I am AdaptTutor. I will be observing your progress and helping you out if you get stuck.' }
     ]);
@@ -46,6 +46,9 @@ export default function TutorChat({ onHelpClick, code, error, sessionId, conditi
                 chat_history: newMessages.slice(1) // skip initial greeting
             });
             setMessages([...newMessages, { role: 'assistant', content: resp.data.response }]);
+            if (resp.data.inferred_state && onStateInferred) {
+                onStateInferred(resp.data.inferred_state);
+            }
         } catch (err) {
             setMessages([...newMessages, { role: 'assistant', content: "Sorry, I'm having trouble connecting to my server right now." }]);
         } finally {

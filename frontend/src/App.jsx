@@ -99,6 +99,7 @@ function App() {
   const [showProblemSurvey, setShowProblemSurvey] = useState(false);
   const [solvedProblems, setSolvedProblems] = useState(new Set());
   const [problemsLoading, setProblemsLoading] = useState(true);
+  const [lastInferredState, setLastInferredState] = useState(null);
   const { trackKeystroke, trackAction } = useTelemetry(sessionId);
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -264,7 +265,8 @@ function App() {
             ...responses,
             problem_id: activeProblem.id,
             problem_title: activeProblem.title,
-            condition: getConditionForProblem(group, currentProblemIndex)
+            condition: getConditionForProblem(group, currentProblemIndex),
+            last_inferred_state: lastInferredState
           }
         });
       } catch (err) {
@@ -282,6 +284,7 @@ function App() {
       setCode(studyProblems[nextIndex].initial_code);
       setOutput('');
       setError('');
+      setLastInferredState(null);
     } else {
       // all problems done, go to post survey
       handleFinishStudy();
@@ -431,6 +434,7 @@ function App() {
         error={error}
         sessionId={sessionId}
         condition={condition}
+        onStateInferred={setLastInferredState}
       />
     </div>
   )
