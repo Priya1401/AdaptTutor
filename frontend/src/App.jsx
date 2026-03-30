@@ -98,26 +98,35 @@ function App() {
   });
   const [showProblemSurvey, setShowProblemSurvey] = useState(false);
   const [solvedProblems, setSolvedProblems] = useState(new Set());
+  const [problemsLoading, setProblemsLoading] = useState(true);
   const { trackKeystroke, trackAction } = useTelemetry(sessionId);
 
   const urlParams = new URLSearchParams(window.location.search);
   const group = urlParams.get('group') || 'a';
 
   React.useEffect(() => {
-    axios.get(`${API_URL}/api/problems`)
-      .then(res => {
-        setAllProblems(res.data);
-        // Map problems in the randomized order for this participant
-        const filtered = studyProblemOrder
-          .map(id => res.data.find(p => p.id === id))
-          .filter(Boolean);
-        setStudyProblems(filtered);
-        if (filtered.length > 0) {
-          setActiveProblem(filtered[0]);
-          setCode(filtered[0].initial_code);
-        }
-      })
-      .catch(err => console.error("Error fetching problems:", err));
+    let attempts = 0;
+    const fetchProblems = () => {
+      attempts++;
+      axios.get(`${API_URL}/api/problems`)
+        .then(res => {
+          setAllProblems(res.data);
+          const filtered = studyProblemOrder
+            .map(id => res.data.find(p => p.id === id))
+            .filter(Boolean);
+          setStudyProblems(filtered);
+          if (filtered.length > 0) {
+            setActiveProblem(filtered[0]);
+            setCode(filtered[0].initial_code);
+          }
+          setProblemsLoading(false);
+        })
+        .catch(err => {
+          console.error(`Error fetching problems (attempt ${attempts}):`, err);
+          if (attempts < 5) setTimeout(fetchProblems, 3000);
+        });
+    };
+    fetchProblems();
   }, []);
 
   // update backend with current problem and condition
@@ -358,6 +367,17 @@ function App() {
         <div className="text-center">
           <h1 className="text-3xl font-bold mb-4">Study Completed</h1>
           <p className="text-gray-400">Thank you for your participation. You may now close this window.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (problemsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#0d1117] text-white">
+        <div className="text-center">
+          <div className="text-4xl mb-4 animate-pulse">⚡</div>
+          <p className="text-gray-400">Loading problems, please wait...</p>
         </div>
       </div>
     );
